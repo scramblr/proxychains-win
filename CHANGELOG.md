@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.1alpha] - 2026-09-07
 
-### Added
+### Original Build Features & Hardening based on proxychains-ng & proxychains-ng for Windows
 - **Zero-Driver, Zero-Daemon Architecture:** Native Windows implementation using Microsoft Detours API hooking for direct in-process injection without kernel drivers, background services, named pipes, or unauthenticated IPC mechanisms.
 - **In-Place Socket Tunneling:** Direct socket negotiation on the caller's original `SOCKET` handle, maintaining 100% compatibility with Windows I/O Completion Ports (IOCP) and asynchronous network runtimes.
 - **Protocol Support:** Full support for SOCKS4, SOCKS5 (with username/password authentication), and HTTP CONNECT proxy protocols.

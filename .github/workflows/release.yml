@@ -66,8 +66,7 @@ jobs:
           }
 
           if (gh release view $tag 2>$null) {
-              Write-Host "Release $tag already exists; updating notes and assets..."
-              gh release edit $tag --title "proxychains-win $tag" --notes-file release_notes.md
+              Write-Host "Release $tag already exists on GitHub; preserving existing release notes and updating assets only..."
               gh release upload $tag $zipPath $shaPath --clobber
           } else {
               Write-Host "Creating new release $tag..."
