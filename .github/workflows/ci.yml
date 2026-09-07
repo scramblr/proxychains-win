@@ -12,27 +12,55 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Build & Test (x64 and Win32)
+    name: Build & Test (${{ matrix.arch }})
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, Win32]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Configure 64-bit Target
-        run: cmake -B build -A x64
+      - name: Configure CMake (${{ matrix.arch }})
+        run: cmake -B build_${{ matrix.arch }} -A ${{ matrix.arch }}
 
-      - name: Build 64-bit Target (Release)
-        run: cmake --build build --config Release --parallel
+      - name: Build (${{ matrix.arch }} Release)
+        run: cmake --build build_${{ matrix.arch }} --config Release --parallel
 
-      - name: Run 64-bit Unit Tests
-        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Run Unit Tests (${{ matrix.arch }})
+        run: ctest --test-dir build_${{ matrix.arch }} -C Release --output-on-failure
 
-      - name: Configure 32-bit Target (Win32)
-        run: cmake -B build32 -A Win32
+      - name: Upload Test Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.arch }}
+          path: build_${{ matrix.arch }}/Testing/Temporary/
 
-      - name: Build 32-bit Target (Release)
-        run: cmake --build build32 --config Release --parallel
+  verify-package:
+    name: Verify Packaging Pipeline
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-      - name: Run 32-bit Unit Tests
-        run: ctest --test-dir build32 -C Release --output-on-failure
+      - name: Run Release Packaging Script
+        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version "ci-verify"
+
+      - name: Verify Archive & Checksum Integrity
+        shell: powershell
+        run: |
+          $zip = "dist\proxychains-win-vci-verify.zip"
+          $sha = "dist\proxychains-win-vci-verify.zip.sha256"
+          if (-not (Test-Path $zip) -or -not (Test-Path $sha)) {
+              throw "Package script failed to produce distribution artifacts"
+          }
+          $expectedHash = ((Get-Content $sha).Trim().Split(" `t"))[0]
+          $actualHash = (Get-FileHash -Path $zip -Algorithm SHA256).Hash
+          if ($expectedHash -ne $actualHash) {
+              throw "SHA256 checksum mismatch: expected $expectedHash, got $actualHash"
+          }
+          Write-Host "Packaging integrity verified: SHA256 matches ($actualHash)"
