@@ -1,0 +1,10 @@
+build/
+build32/
+.vs/
+out/
+bin/
+dist/
+*.user
+*.suo
+tasks/
+reference/
