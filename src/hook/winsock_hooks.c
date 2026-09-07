@@ -89,9 +89,20 @@ static int WSAAPI Hook_WSAConnect(SOCKET s, const struct sockaddr *name, int nam
     return SOCKET_ERROR;
 }
 
+static void ensure_connectex_loaded(SOCKET s) {
+    if (!true_ConnectEx && true_WSAIoctl) {
+        DWORD ret_bytes = 0;
+        GUID guid = WSAID_CONNECTEX;
+        true_WSAIoctl(s, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid),
+                      &true_ConnectEx, sizeof(true_ConnectEx), &ret_bytes, NULL, NULL);
+    }
+}
+
 static BOOL PASCAL Hook_ConnectEx(SOCKET s, const struct sockaddr *name, int namelen,
                                   PVOID lpSendBuffer, DWORD dwSendDataLength,
                                   LPDWORD lpdwBytesSent, LPOVERLAPPED lpOverlapped) {
+    ensure_connectex_loaded(s);
+
     if (t_inside_hook || !g_pxc_hooks_active || g_pxc_active_config.proxy_count == 0 ||
         !name || namelen < (int)sizeof(struct sockaddr_in)) {
         if (true_ConnectEx) {

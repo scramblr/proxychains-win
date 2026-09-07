@@ -146,3 +146,4 @@ Detailed architectural specifications, trade-offs, and security rationales are m
 - [**ADR-006: Dual-Bitness Process Tree Propagation via Detours PE Header Inspection**](docs/decisions/ADR-006-dual-bitness-process-tree-propagation.md)
 - [**ADR-007: Zero External DNS by Default and Tor SOCKS5 Remote Resolution**](docs/decisions/ADR-007-zero-external-dns-default-tor-remote-resolution.md)
 - [**ADR-008: User-Agent Privacy and Anti-Fingerprinting Policy (Hybrid Strategy)**](docs/decisions/ADR-008-user-agent-privacy-and-anti-fingerprinting-policy.md)
+- [**ADR-009: Loopback Isolation and Localnet IPC Bypass**](docs/decisions/ADR-009-loopback-isolation-and-localnet-ipc-bypass.md)

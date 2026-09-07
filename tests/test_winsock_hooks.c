@@ -200,7 +200,50 @@ int main(void) {
 
     FreeAddrInfoW(res);
 
-    printf("  [5] Uninstalling Hooks...\n");
+    printf("  [5] Testing Direct Loopback Bypass (127.0.0.1 IPC without proxy)...\n");
+    SOCKET direct_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    TEST_ASSERT(direct_listen != INVALID_SOCKET);
+
+    struct sockaddr_in d_bind;
+    memset(&d_bind, 0, sizeof(d_bind));
+    d_bind.sin_family = AF_INET;
+    d_bind.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    d_bind.sin_port = 0;
+    TEST_ASSERT(bind(direct_listen, (struct sockaddr *)&d_bind, sizeof(d_bind)) == 0);
+
+    int d_len = sizeof(d_bind);
+    TEST_ASSERT(getsockname(direct_listen, (struct sockaddr *)&d_bind, &d_len) == 0);
+    uint16_t direct_port = ntohs(d_bind.sin_port);
+    TEST_ASSERT(listen(direct_listen, 1) == 0);
+
+    // Client connects to 127.0.0.1:direct_port while hooks are active
+    SOCKET client_direct = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    TEST_ASSERT(client_direct != INVALID_SOCKET);
+
+    struct sockaddr_in d_target;
+    memset(&d_target, 0, sizeof(d_target));
+    d_target.sin_family = AF_INET;
+    d_target.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    d_target.sin_port = htons(direct_port);
+
+    int d_conn = connect(client_direct, (struct sockaddr *)&d_target, sizeof(d_target));
+    TEST_ASSERT(d_conn == 0);
+
+    SOCKET accepted = accept(direct_listen, NULL, NULL);
+    TEST_ASSERT(accepted != INVALID_SOCKET);
+
+    send(client_direct, "LOCAL_IPC_PING", 14, 0);
+    char ipc_buf[32] = { 0 };
+    int ipc_n = recv(accepted, ipc_buf, sizeof(ipc_buf) - 1, 0);
+    TEST_ASSERT(ipc_n == 14);
+    TEST_ASSERT(strcmp(ipc_buf, "LOCAL_IPC_PING") == 0);
+
+    closesocket(accepted);
+    closesocket(client_direct);
+    closesocket(direct_listen);
+    printf("      Direct loopback bypass passed!\n");
+
+    printf("  [6] Uninstalling Hooks...\n");
     g_pxc_hooks_active = false;
     TEST_ASSERT(pxc_uninstall_winsock_hooks() == true);
     TEST_ASSERT(pxc_uninstall_dns_hooks() == true);

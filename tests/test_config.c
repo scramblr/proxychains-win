@@ -227,11 +227,50 @@ static int test_round_robin_config(void) {
     return 0;
 }
 
+static int test_localnet_config(void) {
+    const char *conf =
+        "strict_chain\n"
+        "localnet 127.0.0.0 255.0.0.0\n"
+        "localnet 10.0.0.0/8\n"
+        "localnet 192.168.1.0/24 8080\n"
+        "localnet 172.16.0.1 255.255.255.255 443\n"
+        "[ProxyList]\n"
+        "socks5 127.0.0.1 9050\n";
+
+    pxc_config_t cfg;
+    pxc_parse_result_t res = pxc_config_parse_string(conf, &cfg);
+    TEST_ASSERT(res.ok == true, "Localnet config should parse successfully");
+    TEST_ASSERT(cfg.localnet_count == 4, "Should have parsed 4 localnet entries");
+
+    // Entry 0: 127.0.0.0 / 255.0.0.0
+    TEST_ASSERT(cfg.localnets[0].network.s_addr == htonl(0x7F000000), "Entry 0 network 127.0.0.0");
+    TEST_ASSERT(cfg.localnets[0].netmask.s_addr == htonl(0xFF000000), "Entry 0 netmask 255.0.0.0");
+    TEST_ASSERT(cfg.localnets[0].port == 0, "Entry 0 port 0 (all ports)");
+
+    // Entry 1: 10.0.0.0/8
+    TEST_ASSERT(cfg.localnets[1].network.s_addr == htonl(0x0A000000), "Entry 1 network 10.0.0.0");
+    TEST_ASSERT(cfg.localnets[1].netmask.s_addr == htonl(0xFF000000), "Entry 1 netmask /8");
+    TEST_ASSERT(cfg.localnets[1].port == 0, "Entry 1 port 0");
+
+    // Entry 2: 192.168.1.0/24 8080
+    TEST_ASSERT(cfg.localnets[2].network.s_addr == htonl(0xC0A80100), "Entry 2 network 192.168.1.0");
+    TEST_ASSERT(cfg.localnets[2].netmask.s_addr == htonl(0xFFFFFF00), "Entry 2 netmask /24");
+    TEST_ASSERT(cfg.localnets[2].port == 8080, "Entry 2 port 8080");
+
+    // Entry 3: 172.16.0.1 255.255.255.255 443
+    TEST_ASSERT(cfg.localnets[3].network.s_addr == htonl(0xAC100001), "Entry 3 network 172.16.0.1");
+    TEST_ASSERT(cfg.localnets[3].netmask.s_addr == htonl(0xFFFFFFFF), "Entry 3 netmask 255.255.255.255");
+    TEST_ASSERT(cfg.localnets[3].port == 443, "Entry 3 port 443");
+
+    return 0;
+}
+
 int main(void) {
     printf("Running Task 2 Configuration Parser Unit Tests...\n");
 
     if (test_valid_strict_config() != 0) return 1;
     if (test_round_robin_config() != 0) return 1;
+    if (test_localnet_config() != 0) return 1;
     if (test_nameserver_config() != 0) return 1;
     if (test_user_agent_config() != 0) return 1;
     if (test_reject_overflow_token() != 0) return 1;

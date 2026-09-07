@@ -199,6 +199,95 @@ pxc_parse_result_t pxc_config_parse_string(const char *content, pxc_config_t *ou
                     strncpy_s(out_config->user_agent_pool[out_config->user_agent_pool_count++],
                               PXC_MAX_STRING_LEN, clean_ua, _TRUNCATE);
                 }
+            } else if (_stricmp(token, "localnet") == 0) {
+                if (out_config->localnet_count >= PXC_MAX_LOCALNET) {
+                    res.ok = false;
+                    res.error_line = line_no;
+                    snprintf(res.error_message, sizeof(res.error_message),
+                             "Localnet entry limit reached (maximum %d entries)", PXC_MAX_LOCALNET);
+                    return res;
+                }
+
+                char addr_token[PXC_MAX_STRING_LEN] = { 0 };
+                token_status_t a_stat = next_token(&cursor, addr_token, sizeof(addr_token));
+                if (a_stat != TOKEN_OK) {
+                    res.ok = false;
+                    res.error_line = line_no;
+                    snprintf(res.error_message, sizeof(res.error_message),
+                             "Missing address for localnet on line %d", line_no);
+                    return res;
+                }
+
+                pxc_localnet_entry_t *entry = &out_config->localnets[out_config->localnet_count];
+                memset(entry, 0, sizeof(*entry));
+
+                char mask_token[PXC_MAX_STRING_LEN] = { 0 };
+                char port_token[PXC_MAX_STRING_LEN] = { 0 };
+
+                char *slash = strchr(addr_token, '/');
+                if (slash) {
+                    *slash = '\0';
+                    strncpy_s(mask_token, sizeof(mask_token), slash + 1, _TRUNCATE);
+                    next_token(&cursor, port_token, sizeof(port_token));
+                } else {
+                    token_status_t m_stat = next_token(&cursor, mask_token, sizeof(mask_token));
+                    if (m_stat == TOKEN_OK) {
+                        next_token(&cursor, port_token, sizeof(port_token));
+                    }
+                }
+
+                // Parse network IP
+                if (inet_pton(AF_INET, addr_token, &entry->network) != 1) {
+                    res.ok = false;
+                    res.error_line = line_no;
+                    snprintf(res.error_message, sizeof(res.error_message),
+                             "Invalid localnet IP address '%s' on line %d", addr_token, line_no);
+                    return res;
+                }
+
+                // Parse netmask
+                if (mask_token[0] == '\0') {
+                    entry->netmask.s_addr = 0xFFFFFFFF;
+                } else if (strchr(mask_token, '.')) {
+                    if (inet_pton(AF_INET, mask_token, &entry->netmask) != 1) {
+                        res.ok = false;
+                        res.error_line = line_no;
+                        snprintf(res.error_message, sizeof(res.error_message),
+                                 "Invalid localnet netmask '%s' on line %d", mask_token, line_no);
+                        return res;
+                    }
+                } else {
+                    char *endp = NULL;
+                    long prefix = strtol(mask_token, &endp, 10);
+                    if (!endp || *endp != '\0' || prefix < 0 || prefix > 32) {
+                        res.ok = false;
+                        res.error_line = line_no;
+                        snprintf(res.error_message, sizeof(res.error_message),
+                                 "Invalid localnet CIDR prefix '%s' on line %d", mask_token, line_no);
+                        return res;
+                    }
+                    if (prefix == 0) {
+                        entry->netmask.s_addr = 0;
+                    } else {
+                        entry->netmask.s_addr = htonl(~((1ULL << (32 - prefix)) - 1));
+                    }
+                }
+
+                // Parse optional port
+                if (port_token[0] != '\0') {
+                    char *endp = NULL;
+                    long p = strtol(port_token, &endp, 10);
+                    if (!endp || *endp != '\0' || p <= 0 || p > 65535) {
+                        res.ok = false;
+                        res.error_line = line_no;
+                        snprintf(res.error_message, sizeof(res.error_message),
+                                 "Invalid localnet port '%s' on line %d", port_token, line_no);
+                        return res;
+                    }
+                    entry->port = (uint16_t)p;
+                }
+
+                out_config->localnet_count++;
             }
         } else {
             // Processing [ProxyList] section

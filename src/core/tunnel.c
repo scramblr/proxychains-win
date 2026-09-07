@@ -23,7 +23,16 @@ const char *pxc_tunnel_status_to_string(pxc_tunnel_status_t status) {
 }
 
 bool pxc_is_localnet(const pxc_config_t *config, const pxc_endpoint_t *target) {
-    if (!config || !target) return false;
+    if (!target) return false;
+
+    // IPv6 loopback check (::1)
+    if (target->type == PXC_ADDR_IPV6) {
+        static const unsigned char v6_loopback[16] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 };
+        if (memcmp(&target->addr.ipv6, v6_loopback, 16) == 0) {
+            return true;
+        }
+        return false;
+    }
 
     struct in_addr target_ip = { 0 };
     bool has_v4 = false;
@@ -31,17 +40,37 @@ bool pxc_is_localnet(const pxc_config_t *config, const pxc_endpoint_t *target) {
     if (target->type == PXC_ADDR_IPV4) {
         target_ip = target->addr.ipv4;
         has_v4 = true;
-    } else if (target->type == PXC_ADDR_DOMAIN && strcmp(target->addr.domain, "localhost") == 0) {
-        target_ip.s_addr = htonl(INADDR_LOOPBACK);
-        has_v4 = true;
+    } else if (target->type == PXC_ADDR_DOMAIN) {
+        if (_stricmp(target->addr.domain, "localhost") == 0 ||
+            _stricmp(target->addr.domain, "localhost.") == 0 ||
+            _stricmp(target->addr.domain, "localhost.localdomain") == 0) {
+            target_ip.s_addr = htonl(INADDR_LOOPBACK);
+            has_v4 = true;
+        } else if (inet_pton(AF_INET, target->addr.domain, &target_ip) == 1) {
+            has_v4 = true;
+        }
     }
 
     if (has_v4) {
-        for (uint32_t i = 0; i < config->localnet_count; i++) {
-            const pxc_localnet_entry_t *ln = &config->localnets[i];
-            if ((target_ip.s_addr & ln->netmask.s_addr) == (ln->network.s_addr & ln->netmask.s_addr)) {
-                if (ln->port == 0 || ln->port == target->port) {
-                    return true;
+        // 1. Inherent IPv4 loopback bypass: 127.0.0.0/8 (RFC 1122 / RFC 5735)
+        uint32_t host_ip = ntohl(target_ip.s_addr);
+        if ((host_ip & 0xFF000000) == 0x7F000000 || target_ip.s_addr == htonl(INADDR_LOOPBACK)) {
+            return true;
+        }
+
+        // 2. Inherent 0.0.0.0 (INADDR_ANY) bypass
+        if (target_ip.s_addr == htonl(INADDR_ANY)) {
+            return true;
+        }
+
+        // 3. User-configured localnets
+        if (config) {
+            for (uint32_t i = 0; i < config->localnet_count; i++) {
+                const pxc_localnet_entry_t *ln = &config->localnets[i];
+                if ((target_ip.s_addr & ln->netmask.s_addr) == (ln->network.s_addr & ln->netmask.s_addr)) {
+                    if (ln->port == 0 || ln->port == target->port) {
+                        return true;
+                    }
                 }
             }
         }

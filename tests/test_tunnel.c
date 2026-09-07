@@ -21,17 +21,24 @@ static void test_localnet_matching(void) {
     config.localnets[0].port = 0;
     config.localnet_count = 1;
 
-    pxc_endpoint_t ep1, ep2, ep_localhost;
-    struct in_addr ip1, ip2;
+    pxc_endpoint_t ep1, ep_loopback1, ep_loopback2, ep_localhost, ep_external;
+    struct in_addr ip1, ip_loop1, ip_loop2, ip_ext;
     inet_pton(AF_INET, "192.168.1.100", &ip1);
-    inet_pton(AF_INET, "127.0.0.2", &ip2);
+    inet_pton(AF_INET, "127.0.0.1", &ip_loop1);
+    inet_pton(AF_INET, "127.0.0.2", &ip_loop2);
+    inet_pton(AF_INET, "8.8.8.8", &ip_ext);
 
     pxc_endpoint_from_ipv4(&ep1, ip1, 80);
-    pxc_endpoint_from_ipv4(&ep2, ip2, 80);
+    pxc_endpoint_from_ipv4(&ep_loopback1, ip_loop1, 80);
+    pxc_endpoint_from_ipv4(&ep_loopback2, ip_loop2, 52134);
+    pxc_endpoint_from_ipv4(&ep_external, ip_ext, 80);
     pxc_endpoint_from_domain(&ep_localhost, "localhost", 8080);
 
     TEST_ASSERT(pxc_is_localnet(&config, &ep1) == true);
-    TEST_ASSERT(pxc_is_localnet(&config, &ep2) == false);
+    TEST_ASSERT(pxc_is_localnet(&config, &ep_loopback1) == true);
+    TEST_ASSERT(pxc_is_localnet(&config, &ep_loopback2) == true);
+    TEST_ASSERT(pxc_is_localnet(&config, &ep_localhost) == true);
+    TEST_ASSERT(pxc_is_localnet(&config, &ep_external) == false);
 
     // Port-specific localnet 10.0.0.0/255.0.0.0 port 80 only
     inet_pton(AF_INET, "10.0.0.0", &config.localnets[1].network);

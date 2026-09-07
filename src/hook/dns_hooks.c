@@ -90,6 +90,20 @@ static bool pxc_resolve_domain(const char *domain, struct in_addr *out_ip) {
     return (out_ip->s_addr != INADDR_NONE);
 }
 
+static inline bool is_localhost_w(PCWSTR str) {
+    if (!str) return false;
+    return (_wcsicmp(str, L"localhost") == 0 ||
+            _wcsicmp(str, L"localhost.") == 0 ||
+            _wcsicmp(str, L"localhost.localdomain") == 0);
+}
+
+static inline bool is_localhost_a(const char *str) {
+    if (!str) return false;
+    return (_stricmp(str, "localhost") == 0 ||
+            _stricmp(str, "localhost.") == 0 ||
+            _stricmp(str, "localhost.localdomain") == 0);
+}
+
 static INT WSAAPI Hook_GetAddrInfoW(PCWSTR pNodeName, PCWSTR pServiceName,
                                     const ADDRINFOW *pHints, PADDRINFOW *ppResult) {
     if (!ppResult) return WSAEINVAL;
@@ -102,7 +116,7 @@ static INT WSAAPI Hook_GetAddrInfoW(PCWSTR pNodeName, PCWSTR pServiceName,
     struct in6_addr test_v6;
     if (InetPtonW(AF_INET, pNodeName, &test_v4) == 1 ||
         InetPtonW(AF_INET6, pNodeName, &test_v6) == 1 ||
-        _wcsicmp(pNodeName, L"localhost") == 0) {
+        is_localhost_w(pNodeName)) {
         return true_GetAddrInfoW(pNodeName, pServiceName, pHints, ppResult);
     }
 
@@ -146,17 +160,21 @@ static INT WSAAPI Hook_GetAddrInfoW(PCWSTR pNodeName, PCWSTR pServiceName,
 static VOID WSAAPI Hook_FreeAddrInfo(PADDRINFOW pAddrInfo) {
     if (!pAddrInfo) return;
 
-    pxc_ai_prefix_t *prefix = ((pxc_ai_prefix_t *)pAddrInfo) - 1;
-    if (prefix->magic == PXC_AI_MAGIC) {
-        if (prefix->type == PXC_AI_TYPE_W) {
-            pxc_synthetic_addrinfow_t *wrapper = CONTAINING_RECORD(prefix, pxc_synthetic_addrinfow_t, prefix);
-            free(wrapper);
-            return;
-        } else if (prefix->type == PXC_AI_TYPE_A) {
-            pxc_synthetic_addrinfoa_t *wrapper = CONTAINING_RECORD(prefix, pxc_synthetic_addrinfoa_t, prefix);
-            free(wrapper);
-            return;
+    __try {
+        pxc_ai_prefix_t *prefix = ((pxc_ai_prefix_t *)pAddrInfo) - 1;
+        if (prefix->magic == PXC_AI_MAGIC) {
+            if (prefix->type == PXC_AI_TYPE_W) {
+                pxc_synthetic_addrinfow_t *wrapper = CONTAINING_RECORD(prefix, pxc_synthetic_addrinfow_t, prefix);
+                free(wrapper);
+                return;
+            } else if (prefix->type == PXC_AI_TYPE_A) {
+                pxc_synthetic_addrinfoa_t *wrapper = CONTAINING_RECORD(prefix, pxc_synthetic_addrinfoa_t, prefix);
+                free(wrapper);
+                return;
+            }
         }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        // Fall through to true_FreeAddrInfoW
     }
 
     if (true_FreeAddrInfoW) {
@@ -179,7 +197,7 @@ static INT WSAAPI Hook_GetAddrInfoExW(PCWSTR pName, PCWSTR pServiceName, DWORD d
     struct in6_addr test_v6;
     if (InetPtonW(AF_INET, pName, &test_v4) == 1 ||
         InetPtonW(AF_INET6, pName, &test_v6) == 1 ||
-        _wcsicmp(pName, L"localhost") == 0) {
+        is_localhost_w(pName)) {
         return true_GetAddrInfoExW(pName, pServiceName, dwNameSpace, lpNspId, hints, ppResult,
                                    timeout, lpOverlapped, lpCompletionRoutine, lpNameHandle);
     }
@@ -236,11 +254,15 @@ static INT WSAAPI Hook_GetAddrInfoExW(PCWSTR pName, PCWSTR pServiceName, DWORD d
 static VOID WSAAPI Hook_FreeAddrInfoExW(PADDRINFOEXW pAddrInfo) {
     if (!pAddrInfo) return;
 
-    pxc_ai_prefix_t *prefix = ((pxc_ai_prefix_t *)pAddrInfo) - 1;
-    if (prefix->magic == PXC_AI_MAGIC && prefix->type == PXC_AI_TYPE_EXW) {
-        pxc_synthetic_addrinfoexw_t *wrapper = CONTAINING_RECORD(prefix, pxc_synthetic_addrinfoexw_t, prefix);
-        free(wrapper);
-        return;
+    __try {
+        pxc_ai_prefix_t *prefix = ((pxc_ai_prefix_t *)pAddrInfo) - 1;
+        if (prefix->magic == PXC_AI_MAGIC && prefix->type == PXC_AI_TYPE_EXW) {
+            pxc_synthetic_addrinfoexw_t *wrapper = CONTAINING_RECORD(prefix, pxc_synthetic_addrinfoexw_t, prefix);
+            free(wrapper);
+            return;
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        // Fall through
     }
 
     if (true_FreeAddrInfoExW) {
@@ -260,7 +282,7 @@ static int WSAAPI Hook_getaddrinfo(const char *nodename, const char *servname,
     struct in6_addr test_v6;
     if (inet_pton(AF_INET, nodename, &test_v4) == 1 ||
         inet_pton(AF_INET6, nodename, &test_v6) == 1 ||
-        _stricmp(nodename, "localhost") == 0) {
+        is_localhost_a(nodename)) {
         return true_getaddrinfo(nodename, servname, hints, res);
     }
 
@@ -300,7 +322,7 @@ static struct hostent * WSAAPI Hook_gethostbyname(const char *name) {
     if (!name) return NULL;
 
     struct in_addr test_v4;
-    if (inet_pton(AF_INET, name, &test_v4) == 1 || _stricmp(name, "localhost") == 0) {
+    if (inet_pton(AF_INET, name, &test_v4) == 1 || is_localhost_a(name)) {
         return true_gethostbyname(name);
     }
 
