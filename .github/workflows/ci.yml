@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & Test (x64 and Win32)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure 64-bit Target
+        run: cmake -B build -A x64
+
+      - name: Build 64-bit Target (Release)
+        run: cmake --build build --config Release --parallel
+
+      - name: Run 64-bit Unit Tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Configure 32-bit Target (Win32)
+        run: cmake -B build32 -A Win32
+
+      - name: Build 32-bit Target (Release)
+        run: cmake --build build32 --config Release --parallel
+
+      - name: Run 32-bit Unit Tests
+        run: ctest --test-dir build32 -C Release --output-on-failure

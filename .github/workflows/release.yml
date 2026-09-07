@@ -1,0 +1,75 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-release:
+    name: Build, Package & Publish Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build, Test & Package Distribution Artifacts
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          Write-Host "Packaging release version: $version from tag: $tag"
+          powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version $version
+
+      - name: Extract Release Notes from CHANGELOG.md
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $escapedVer = [regex]::Escape($version)
+          $pattern = "(?s)## \[$escapedVer\] - \d{4}-\d{2}-\d{2}\r?\n(.*?)(?=\r?\n## \[|\Z)"
+          if ($changelog -match $pattern) {
+              $notes = $matches[1].Trim()
+              $header = "# proxychains-win $tag`n`n"
+              Set-Content -Path release_notes.md -Value ($header + $notes) -Encoding utf8
+          } else {
+              Set-Content -Path release_notes.md -Value "proxychains-win release $tag" -Encoding utf8
+          }
+          Write-Host "Generated release notes:"
+          Get-Content release_notes.md
+
+      - name: Publish Release to GitHub
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag.TrimStart('v')
+          $isPrerelease = ($version -match "(alpha|beta|rc)")
+          $zipPath = "dist\proxychains-win-v$version.zip"
+          $shaPath = "dist\proxychains-win-v$version.zip.sha256"
+
+          if (-not (Test-Path $zipPath) -or -not (Test-Path $shaPath)) {
+              throw "Release assets not found in dist/"
+          }
+
+          $args = @("release", "create", $tag, $zipPath, $shaPath, "--title", "proxychains-win $tag", "--notes-file", "release_notes.md")
+          if ($isPrerelease) {
+              $args += "--prerelease"
+          }
+
+          if (gh release view $tag 2>$null) {
+              Write-Host "Release $tag already exists; updating notes and assets..."
+              gh release edit $tag --title "proxychains-win $tag" --notes-file release_notes.md
+              gh release upload $tag $zipPath $shaPath --clobber
+          } else {
+              Write-Host "Creating new release $tag..."
+              gh @args
+          }
