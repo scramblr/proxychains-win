@@ -6,13 +6,13 @@
     and bundles the distribution binaries, configuration, and documentation
     into a versioned zip package with SHA256 checksums.
 .PARAMETER Version
-    The release version tag (defaults to "0.5.1alpha").
+    The release version tag (defaults to "0.5.2alpha").
 .PARAMETER SkipBuild
     Skip CMake compilation and test steps, packaging existing binaries.
 #>
 
 param (
-    [string]$Version = "0.5.1alpha",
+    [string]$Version = "0.5.2alpha",
     [switch]$SkipBuild = $false
 )
 

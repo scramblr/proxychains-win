@@ -1,4 +1,4 @@
-# proxychains-win v0.5.1alpha
+# proxychains-win v0.5.2alpha
 
 A security-hardened, zero-driver native Windows implementation built from the ground up and inspired by the design of proxychains-ng and security hardened using the most recent advancements from Tor Project guidance & Industry Standards. Forces TCP traffic from any command-line application through SOCKS4, SOCKS5, or HTTP CONNECT proxy chains using Windows-native API hooking (Microsoft Detours).
 
@@ -52,7 +52,7 @@ For unified deployment, place both hook DLLs alongside the launcher:
 ### Automated Release Packaging
 To build both 64-bit and 32-bit architectures, execute all test suites, and generate a release zip archive with SHA256 checksums:
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version "0.5.1alpha"
+powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version "0.5.2alpha"
 ```
 
 ---

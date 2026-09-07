@@ -17,9 +17,9 @@
 
 #define PXC_VERSION_MAJOR 0
 #define PXC_VERSION_MINOR 5
-#define PXC_VERSION_PATCH 1
+#define PXC_VERSION_PATCH 2
 #define PXC_VERSION_SUFFIX L"alpha"
-#define PXC_VERSION_STR L"0.5.1alpha"
+#define PXC_VERSION_STR L"0.5.2alpha"
 
 #ifdef _WIN64
 #define PXC_HOOK_DLL_NAME L"proxychains64.dll"

@@ -5,6 +5,15 @@ All notable changes to `proxychains-win` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2alpha] - 2026-09-07
+
+### Added
+- **Loopback Isolation & Localnet IPC Bypass (ADR-009):**
+  - Inherent loopback bypass for `127.0.0.0/8`, IPv6 `::1`, `0.0.0.0`, and `localhost` hostnames, allowing tools like Kleopatra / Gpg4win to seamlessly interface with local daemons (`gpg-agent`, `dirmngr`, `scdaemon`) without proxy interception.
+  - Complete `localnet` configuration parser supporting both netmask and CIDR formats (`localnet <ip> <netmask> [port]` and `localnet <ip>/<cidr> [port]`).
+  - SEH-protected `addrinfo` free handler preventing memory faults during heterogeneous address deallocations.
+  - Lazy provider initialization for `ConnectEx` on localnet connections.
+
 ## [0.5.1alpha] - 2026-09-07
 
 ### Added
@@ -34,9 +43,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dual launcher binaries: `proxychains-win.exe` and `proxychains.exe`.
   - Supports `-q` / `--quiet` mode, `-f <config>` custom configuration, `-v` / `--version`, and `-h` / `--help`.
   - Multi-tier configuration search (`-f`, `PROXYCHAINS_CONF_FILE`, local directory, executable directory, `%APPDATA%`, `%USERPROFILE%`).
-- **Loopback Isolation & Localnet IPC Bypass (ADR-009):**
-  - Inherent loopback bypass for `127.0.0.0/8`, IPv6 `::1`, `0.0.0.0`, and `localhost` hostnames, allowing tools like Kleopatra / Gpg4win to seamlessly interface with local daemons (`gpg-agent`, `dirmngr`, `scdaemon`) without proxy interception.
-  - Complete `localnet` configuration parser supporting both netmask and CIDR formats (`localnet <ip> <netmask> [port]` and `localnet <ip>/<cidr> [port]`).
-  - SEH-protected `addrinfo` free handler preventing memory faults during heterogeneous address deallocations.
-  - Lazy provider initialization for `ConnectEx` on localnet connections.
 - **Automated Packaging Pipeline:** PowerShell script (`scripts/package.ps1`) automating dual-architecture compilation, full test execution, artifact staging, and SHA256 release checksum generation.
